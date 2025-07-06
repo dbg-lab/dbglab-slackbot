@@ -177,6 +177,240 @@ class TestSlackService:
         assert service.bot_token == "xoxb-test-token-12345"
 
 
+class TestSlackServicePostMessage:
+    """Test suite for the post_message functionality."""
+    
+    def _create_mock_service(self):
+        """Helper method to create a mock SlackService."""
+        with patch('app.services.slack_service.WebClient') as mock_webclient_class:
+            mock_client = Mock()
+            mock_webclient_class.return_value = mock_client
+            
+            # Mock successful auth test
+            mock_response = {
+                "ok": True,
+                "user_id": "U123456",
+                "team_id": "T123456"
+            }
+            mock_client.auth_test.return_value = mock_response
+            
+            service = SlackService("xoxb-test-token")
+            return service, mock_client
+    
+    def test_post_message_success(self):
+        """Test successful message posting."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock successful message posting
+        mock_client.chat_postMessage.return_value = {"ok": True}
+        
+        # Test posting a message
+        result = service.post_message("C123456", "Hello world!")
+        
+        # Verify the result
+        assert result is True
+        
+        # Verify the API was called correctly
+        mock_client.chat_postMessage.assert_called_once_with(
+            channel="C123456",
+            text="Hello world!"
+        )
+    
+    def test_post_message_with_thread_ts(self):
+        """Test posting a message with thread timestamp."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock successful message posting
+        mock_client.chat_postMessage.return_value = {"ok": True}
+        
+        # Test posting a message with thread_ts
+        result = service.post_message("C123456", "Reply in thread", thread_ts="1234567890.123456")
+        
+        # Verify the result
+        assert result is True
+        
+        # Verify the API was called correctly
+        mock_client.chat_postMessage.assert_called_once_with(
+            channel="C123456",
+            text="Reply in thread",
+            thread_ts="1234567890.123456"
+        )
+    
+    def test_post_message_empty_channel_raises_error(self):
+        """Test that empty channel raises ValueError."""
+        service, mock_client = self._create_mock_service()
+        
+        with pytest.raises(ValueError, match="Channel cannot be empty or None"):
+            service.post_message("", "Hello world!")
+    
+    def test_post_message_none_channel_raises_error(self):
+        """Test that None channel raises ValueError."""
+        service, mock_client = self._create_mock_service()
+        
+        with pytest.raises(ValueError, match="Channel cannot be empty or None"):
+            service.post_message(None, "Hello world!")
+    
+    def test_post_message_empty_text_raises_error(self):
+        """Test that empty text raises ValueError."""
+        service, mock_client = self._create_mock_service()
+        
+        with pytest.raises(ValueError, match="Message text cannot be empty or None"):
+            service.post_message("C123456", "")
+    
+    def test_post_message_none_text_raises_error(self):
+        """Test that None text raises ValueError."""
+        service, mock_client = self._create_mock_service()
+        
+        with pytest.raises(ValueError, match="Message text cannot be empty or None"):
+            service.post_message("C123456", None)
+    
+    def test_post_message_whitespace_handling(self):
+        """Test that whitespace in channel and text is handled correctly."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock successful message posting
+        mock_client.chat_postMessage.return_value = {"ok": True}
+        
+        # Test posting with whitespace
+        result = service.post_message("  C123456  ", "  Hello world!  ")
+        
+        # Verify the result
+        assert result is True
+        
+        # Verify whitespace was stripped
+        mock_client.chat_postMessage.assert_called_once_with(
+            channel="C123456",
+            text="Hello world!"
+        )
+    
+    def test_post_message_channel_not_found_error(self):
+        """Test channel not found error handling."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock channel not found error
+        error_response = {"error": "channel_not_found"}
+        mock_client.chat_postMessage.side_effect = SlackApiError(
+            message="Channel not found",
+            response=error_response
+        )
+        
+        # Test that proper error is raised
+        with pytest.raises(RuntimeError, match="Channel not found: C123456"):
+            service.post_message("C123456", "Hello world!")
+    
+    def test_post_message_not_in_channel_error(self):
+        """Test not in channel error handling."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock not in channel error
+        error_response = {"error": "not_in_channel"}
+        mock_client.chat_postMessage.side_effect = SlackApiError(
+            message="Not in channel",
+            response=error_response
+        )
+        
+        # Test that proper error is raised
+        with pytest.raises(RuntimeError, match="Bot is not in channel: C123456"):
+            service.post_message("C123456", "Hello world!")
+    
+    def test_post_message_is_archived_error(self):
+        """Test archived channel error handling."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock archived channel error
+        error_response = {"error": "is_archived"}
+        mock_client.chat_postMessage.side_effect = SlackApiError(
+            message="Channel is archived",
+            response=error_response
+        )
+        
+        # Test that proper error is raised
+        with pytest.raises(RuntimeError, match="Channel is archived: C123456"):
+            service.post_message("C123456", "Hello world!")
+    
+    def test_post_message_msg_too_long_error(self):
+        """Test message too long error handling."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock message too long error
+        error_response = {"error": "msg_too_long"}
+        mock_client.chat_postMessage.side_effect = SlackApiError(
+            message="Message too long",
+            response=error_response
+        )
+        
+        # Test that proper error is raised
+        with pytest.raises(RuntimeError, match="Message text is too long"):
+            service.post_message("C123456", "Very long message...")
+    
+    def test_post_message_rate_limited_error(self):
+        """Test rate limited error handling."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock rate limited error
+        error_response = {"error": "rate_limited"}
+        mock_client.chat_postMessage.side_effect = SlackApiError(
+            message="Rate limited",
+            response=error_response
+        )
+        
+        # Test that proper error is raised
+        with pytest.raises(RuntimeError, match="Rate limit exceeded - please try again later"):
+            service.post_message("C123456", "Hello world!")
+    
+    def test_post_message_thread_not_found_error(self):
+        """Test thread not found error handling."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock thread not found error
+        error_response = {"error": "thread_not_found"}
+        mock_client.chat_postMessage.side_effect = SlackApiError(
+            message="Thread not found",
+            response=error_response
+        )
+        
+        # Test that proper error is raised
+        with pytest.raises(RuntimeError, match="Thread not found for the provided thread_ts"):
+            service.post_message("C123456", "Hello world!", thread_ts="invalid_thread_ts")
+    
+    def test_post_message_other_slack_api_error(self):
+        """Test other Slack API errors."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock other API error
+        error_response = {"error": "some_other_error"}
+        mock_client.chat_postMessage.side_effect = SlackApiError(
+            message="Some other error",
+            response=error_response
+        )
+        
+        # Test that proper error is raised
+        with pytest.raises(RuntimeError, match="Slack API error: some_other_error"):
+            service.post_message("C123456", "Hello world!")
+    
+    def test_post_message_api_response_not_ok(self):
+        """Test when API response is not ok."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock API response with ok=False
+        mock_client.chat_postMessage.return_value = {"ok": False, "error": "some_error"}
+        
+        # Test that proper error is raised
+        with pytest.raises(RuntimeError, match="Slack API returned error: some_error"):
+            service.post_message("C123456", "Hello world!")
+    
+    def test_post_message_generic_error_handling(self):
+        """Test generic error handling in post_message."""
+        service, mock_client = self._create_mock_service()
+        
+        # Mock generic error
+        mock_client.chat_postMessage.side_effect = Exception("Network error")
+        
+        # Test that proper error is raised
+        with pytest.raises(RuntimeError, match="Failed to post message to Slack: Network error"):
+            service.post_message("C123456", "Hello world!")
+
+
 class TestSlackServiceIntegration:
     """Integration tests for Slack service with real API (if available)."""
     
