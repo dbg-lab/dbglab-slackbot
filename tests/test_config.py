@@ -17,20 +17,32 @@ class TestConfig:
             if var in os.environ:
                 del os.environ[var]
     
-    def test_missing_required_vars_raises_error(self):
+    @patch('app.utils.config.load_dotenv')
+    def test_missing_required_vars_raises_error(self, mock_load_dotenv):
         """Test that missing required environment variables raise ValueError."""
+        # Mock load_dotenv to do nothing (simulate no .env file)
+        mock_load_dotenv.return_value = None
+        
         with pytest.raises(ValueError, match="Missing required environment variable: SLACK_BOT_TOKEN"):
             Config()
     
-    def test_missing_slack_signing_secret_raises_error(self):
+    @patch('app.utils.config.load_dotenv')
+    def test_missing_slack_signing_secret_raises_error(self, mock_load_dotenv):
         """Test that missing SLACK_SIGNING_SECRET raises ValueError."""
+        # Mock load_dotenv to do nothing
+        mock_load_dotenv.return_value = None
+        
         os.environ['SLACK_BOT_TOKEN'] = 'test-token'
         
         with pytest.raises(ValueError, match="Missing required environment variable: SLACK_SIGNING_SECRET"):
             Config()
     
-    def test_missing_openai_api_key_raises_error(self):
+    @patch('app.utils.config.load_dotenv')
+    def test_missing_openai_api_key_raises_error(self, mock_load_dotenv):
         """Test that missing OPENAI_API_KEY raises ValueError."""
+        # Mock load_dotenv to do nothing
+        mock_load_dotenv.return_value = None
+        
         os.environ['SLACK_BOT_TOKEN'] = 'test-token'
         os.environ['SLACK_SIGNING_SECRET'] = 'test-secret'
         
@@ -82,6 +94,9 @@ class TestConfig:
     @patch('app.utils.config.load_dotenv')
     def test_dotenv_is_called(self, mock_load_dotenv):
         """Test that load_dotenv is called during config initialization."""
+        # Mock load_dotenv to do nothing
+        mock_load_dotenv.return_value = None
+        
         os.environ['SLACK_BOT_TOKEN'] = 'xoxb-test-token'
         os.environ['SLACK_SIGNING_SECRET'] = 'test-signing-secret'
         os.environ['OPENAI_API_KEY'] = 'sk-test-api-key'
