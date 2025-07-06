@@ -1,0 +1,1 @@
+# Empty file - Configuration management will be implemented later 

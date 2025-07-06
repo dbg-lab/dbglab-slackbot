@@ -1,0 +1,1 @@
+# Empty file - Slack service will be implemented later 

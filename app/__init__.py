@@ -1,0 +1,1 @@
+# Empty file - Flask app factory will be implemented later 
